@@ -644,7 +644,11 @@ function wirePage(){
     const newEmail = document.getElementById('fb-new-email').value.trim();
     const errEl = document.getElementById('fb-email-err'); errEl.textContent='';
     if(!newEmail) return;
-    firebase.auth().currentUser.updateEmail(newEmail).then(()=>{ render(); }).catch(e=>{
+    firebase.auth().currentUser.verifyBeforeUpdateEmail(newEmail).then(()=>{
+      errEl.style.color='var(--good)';
+      errEl.textContent = `Check ${newEmail} for a verification link — your login email updates once you click it.`;
+    }).catch(e=>{
+      errEl.style.color='#dc2626';
       errEl.textContent = e.code==='auth/requires-recent-login'
         ? 'For security, Firebase needs you to sign out and sign back in before changing your email — then try again.'
         : e.message;
