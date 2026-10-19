@@ -470,6 +470,7 @@ function pageSubjects(){
   `;
 }
 
+let assessOpen = {};
 function pageAssessments(){
   const t0 = todayISO();
   return `
@@ -477,13 +478,19 @@ function pageAssessments(){
   ${DATA.assessments.length? [...DATA.assessments].sort((a,b)=>a.date.localeCompare(b.date)).map(a=>{
     const topics = DATA.topics.filter(t=>a.topicIds.includes(t.id));
     const prep = topics.length? Math.round(topics.filter(t=>t.status==='mastered'||t.status==='comfortable').length/topics.length*100):0;
+    const open = !!assessOpen[a.id];
     return `<div class="card">
       <div class="between">
         <div><div style="font-weight:600;">${a.name}</div><div class="small muted">${subjName(a.subjectId)} · ${fmtDate(a.date)} · ${a.date>=t0?daysBetween(t0,a.date)+'d away':'past'}</div></div>
         <button class="btn btn-sm btn-ghost" data-remove-assessment="${a.id}">Remove</button>
       </div>
       <div class="progressbar" style="margin-top:10px;"><div class="fill" style="width:${prep}%"></div></div>
-      <div class="small muted" style="margin-top:4px;">Preparation: ${prep}% · ${topics.length} topic(s) linked</div>
+      <div class="collapse-head ${open?'open':''}" style="padding:8px 0 4px;border-bottom:none;" data-toggle-assessment="${a.id}">
+        <span class="row small muted"><svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M9 6l6 6-6 6"/></svg>Preparation: ${prep}% · ${topics.length} topic(s) linked</span>
+      </div>
+      ${open ? (topics.length ? groupTopics(topics).map(g=>`<div class="small muted" style="margin:6px 0 2px;font-weight:600;">${g.group}</div>
+        ${g.items.map(t=>`<label class="checklabel" style="padding-left:4px;"><input type="checkbox" data-assess-topic="${t.id}" ${(t.status==='comfortable'||t.status==='mastered')?'checked':''}><span>${t.name.includes(' — ')?t.name.split(' — ').slice(1).join(' — '):t.name}</span></label>`).join('')}`
+      ).join('') : `<div class="small muted">No topics linked to this assessment.</div>`) : ''}
     </div>`;
   }).join('') : `<div class="empty card">No assessments yet.</div>`}
   `;
@@ -624,6 +631,14 @@ function wirePage(){
     DATA.assessments=DATA.assessments.filter(a=>a.subjectId!==id); generateSchedule(); save();
   });
   const addAss = document.querySelector('[data-add-assessment]'); if(addAss) addAss.onclick=()=>{ modal={type:'assessment'}; render(); };
+  document.querySelectorAll('[data-toggle-assessment]').forEach(h=>h.onclick=()=>{ const id=h.dataset.toggleAssessment; assessOpen[id]=!assessOpen[id]; render(); });
+  document.querySelectorAll('[data-assess-topic]').forEach(cb=>cb.onchange=()=>{
+    const t = DATA.topics.find(x=>x.id===cb.dataset.assessTopic); if(!t) return;
+    const rank = {'not-started':0,'learning':1,'comfortable':2,'mastered':3};
+    if(cb.checked){ if(rank[t.status||'not-started']<rank['comfortable']) t.status='comfortable'; }
+    else { if(t.status==='comfortable') t.status='learning'; }
+    generateSchedule(); save();
+  });
   document.querySelectorAll('[data-remove-assessment]').forEach(b=>b.onclick=()=>{
     DATA.assessments=DATA.assessments.filter(a=>a.id!==b.dataset.removeAssessment); generateSchedule(); save();
   });
